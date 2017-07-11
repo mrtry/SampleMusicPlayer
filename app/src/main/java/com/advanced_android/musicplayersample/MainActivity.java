@@ -12,6 +12,10 @@ import android.view.View;
 
 public class MainActivity extends AppCompatActivity {
 
+    final public static int PLAYER_PLAY = 1;
+    final public static int PLAYER_STOP = 2;
+    Intent intent;
+
     private Boolean mIsPlaying;
     private View mBtnPlay;
     private View mBtnStop;
@@ -22,7 +26,7 @@ public class MainActivity extends AppCompatActivity {
         public void onServiceConnected(ComponentName className, IBinder binder) {
             mServiceBinder = ((BackgroundMusicService.MyBinder) binder).getService();
             Log.d("ServiceConnection","connected");
-            updateButtonEnabled();
+            
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -35,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        intent = new Intent(this, BackgroundMusicService.class);
 
         mBtnPlay = findViewById(R.id.btn_play);
         mBtnPlay.setOnClickListener(new View.OnClickListener() {
@@ -43,7 +48,10 @@ public class MainActivity extends AppCompatActivity {
                 if (mServiceBinder != null) {
                     mServiceBinder.play();
                 }
-                updateButtonEnabled();
+
+                // startServiceをコメントアウトしたりして、startServiceの挙動を確かめる
+                intent.putExtra("PLAYER_CONTROL", PLAYER_PLAY);
+                //startService(intent);
             }
         });
         mBtnStop = findViewById(R.id.btn_stop);
@@ -53,24 +61,12 @@ public class MainActivity extends AppCompatActivity {
                 if (mServiceBinder != null) {
                     mServiceBinder.stop();
                 }
-                updateButtonEnabled();
+
+                // startServiceをコメントアウトしたりして、startServiceの挙動を確かめる
+                intent.putExtra("PLAYER_CONTROL", PLAYER_STOP);
+                //startService(intent);
             }
         });
-    }
-
-    private void updateButtonEnabled() {
-        if (mServiceBinder != null) {
-            if (mServiceBinder.isPlaying()) {
-                mBtnPlay.setEnabled(false);
-                mBtnStop.setEnabled(true);
-            } else {
-                mBtnPlay.setEnabled(true);
-                mBtnStop.setEnabled(false);
-            }
-        } else {
-            mBtnPlay.setEnabled(false);
-            mBtnStop.setEnabled(false);
-        }
     }
 
     public void doBindService() {
@@ -84,10 +80,15 @@ public class MainActivity extends AppCompatActivity {
         Log.d("activity", "onResume");
         super.onResume();
         if (mServiceBinder == null) {
-            // サービスにバインド
+            // ここで、bindするかを切り変える
             doBindService();
         }
-        startService(new Intent(getApplicationContext(), BackgroundMusicService.class));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        //unbindService(myConnection);
     }
 
     @Override
@@ -99,9 +100,10 @@ public class MainActivity extends AppCompatActivity {
             if (!mIsPlaying) {
                 mServiceBinder.stopSelf();
             }
-            unbindService(myConnection);
             mServiceBinder = null;
         }
     }
+
+
 }
 

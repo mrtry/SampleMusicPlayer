@@ -2,19 +2,19 @@ package com.advanced_android.musicplayersample;
 
 import android.app.ActivityManager;
 import android.app.Notification;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.IBinder;
-import android.support.annotation.Nullable;
 import android.util.Log;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class BackgroundMusicService extends Service {
 
@@ -81,31 +81,51 @@ public class BackgroundMusicService extends Service {
         super.onCreate();
         Log.d(TAG, "onCreate");
 
-        Intent intent = new Intent(this, BackgroundMusicService.class);
-        intent.putExtra("PendingIntent", 1);
-        PendingIntent pendingIntent = PendingIntent.getService(this, 0, intent, 0);
+        // 3秒ごとにプロセス優先順位度をログに出す
+        getProcessInfo();
+
         Notification notification = new Notification.Builder(this)
                 .setContentTitle("Title")
                 .setContentText("Text")
-                .setContentIntent(pendingIntent)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .build();
-        startForeground(notifiId, notification);
+
+        // startForeground()試したかったら、ここをコメントアウトする
+        //startForeground(notifiId, notification);
+    }
+
+    @Override
+    public void onDestroy() {
+        //stopForeground(true);
+        stop();
+
+        Log.i(TAG, "onDestroy");
+        super.onDestroy();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand");
 
-        int flag = intent.getIntExtra("PendingIntent", 0);
+        if (intent != null) {
+            int val = intent.getIntExtra("PLAYER_CONTROL", 0);
 
-        if (flag == 1) {
-            searchRunningAppProcesses();
+            switch (val) {
+                case MainActivity.PLAYER_PLAY:
+                    play();
+                    break;
+
+                case MainActivity.PLAYER_STOP:
+                    stopSelf();
+                    break;
+
+                default:
+                    break;
+            }
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
-
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
@@ -113,11 +133,6 @@ public class BackgroundMusicService extends Service {
         Log.i(TAG, "onTaskRemoved()");
     }
 
-    @Override
-    public void onDestroy() {
-        Log.i(TAG, "onDestroy");
-        super.onDestroy();
-    }
 
     private ActivityManager manager;
     private static Map<Integer, String> importance = new HashMap<Integer, String>();
@@ -136,19 +151,24 @@ public class BackgroundMusicService extends Service {
         reason.put(ActivityManager.RunningAppProcessInfo.REASON_UNKNOWN, "UNKNOWN");
     }
 
-    private void searchRunningAppProcesses() {
-        manager = (ActivityManager)getSystemService(Context.ACTIVITY_SERVICE);
+    private void getProcessInfo() {
+        new Timer().schedule(new TimerTask() {
+            @Override
+            public void run() {
+                ActivityManager manager = (ActivityManager)getSystemService(Context.ACTIVITY_SERVICE);
 
-        final List<ActivityManager.RunningAppProcessInfo> apps = manager.getRunningAppProcesses();
-        for (ActivityManager.RunningAppProcessInfo rapi : apps) {
-            if (rapi.processName.contains("musicplayersample")) {
+                final List<ActivityManager.RunningAppProcessInfo> apps = manager.getRunningAppProcesses();
+                for (ActivityManager.RunningAppProcessInfo rapi : apps) {
+                    if (rapi.processName.contains(getPackageName())) {
 
-                Log.d("RunningAppProcessInfo", "processName: " + rapi.processName);
-                Log.d("RunningAppProcessInfo", "importance: " + importance.get(rapi.importance));
-                Log.d("RunningAppProcessInfo", "importanceResonCode: " + rapi.importanceReasonCode);
+                        Log.d(getPackageName() + " ProcessInfo", "processName: " + rapi.processName);
+                        Log.d(getPackageName() + " ProcessInfo", "importance: " + importance.get(rapi.importance));
+                        Log.d(getPackageName() + " ProcessInfo", "importanceResonCode: " + rapi.importanceReasonCode);
 
-                break;
+                        break;
+                    }
+                }
             }
-        }
+        }, 0, 3000);
     }
 }
